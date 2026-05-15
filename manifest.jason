@@ -1,0 +1,16 @@
+{
+  "name": "Om Toro Scanner",
+  "short_name": "ToroScan",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a192f",
+  "theme_color": "#ff9f1c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://www.google.com/images/icons/product/keep-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
