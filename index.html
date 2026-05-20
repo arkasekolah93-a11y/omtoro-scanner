@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Om Toro Scanner</title>
+    <title>Om Toro Scanner Pro</title>
     <link rel="manifest" href="manifest.json">
     
     <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    <!-- OpenCV.js untuk Auto-Detect Frame -->
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"></script>
 
     <style>
@@ -18,57 +17,58 @@
         header { position: absolute; top: 0; width: 100%; padding: 15px 0; text-align: center; background: linear-gradient(#0a192f, transparent); z-index: 10; }
         header h2 { margin: 0; color: var(--accent-color); font-size: 18px; letter-spacing: 1px; }
         
-        #camera-container { width: 100%; height: 100%; position: absolute; top: 0; z-index: 1; }
-        video { width: 100%; height: 100%; object-fit: cover; }
+        #camera-wrapper { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; display: flex; justify-content: center; align-items: center; }
+        video { width: 100%; height: 100%; object-fit: contain; background: #000; }
         
-        /* Layer Transparan untuk menggambar bingkai dinamis */
         #overlay-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
 
         .controls-overlay {
-            position: absolute; bottom: 0; width: 100%; padding: 15px;
-            background: linear-gradient(transparent, var(--bg-color) 30%);
+            position: absolute; bottom: 0; width: 100%; padding: 20px;
+            background: linear-gradient(transparent, var(--bg-color) 40%);
             z-index: 10; display: flex; flex-direction: column; align-items: center; box-sizing: border-box;
         }
 
-        .status-bar { font-size: 12px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 15px; margin-bottom: 10px; color: var(--accent-color); font-weight: bold;}
-        .ocr-result { width: 90%; max-height: 60px; overflow-y: auto; font-size: 11px; background: rgba(255,255,255,0.1); padding: 5px; margin-bottom: 10px; border-radius: 5px; display: none; }
+        .status-bar { font-size: 12px; background: rgba(0,0,0,0.7); padding: 6px 14px; border-radius: 20px; margin-bottom: 12px; color: var(--accent-color); font-weight: bold; border: 1px solid rgba(255,159,28,0.3); }
+        .ocr-result { width: 90%; max-height: 70px; overflow-y: auto; font-size: 11px; background: rgba(255,255,255,0.1); padding: 8px; margin-bottom: 12px; border-radius: 5px; display: none; border-left: 3px solid var(--accent-color); }
 
-        .btn-row { display: flex; gap: 10px; margin-bottom: 15px; }
-        button { border: none; border-radius: 8px; padding: 10px 15px; font-weight: bold; cursor: pointer; color: var(--text-light); background: rgba(255,255,255,0.1); transition: 0.2s; }
+        .btn-row { display: flex; gap: 12px; margin-bottom: 12px; }
+        button { border: none; border-radius: 6px; padding: 10px 18px; font-weight: bold; cursor: pointer; color: var(--text-light); background: rgba(255,255,255,0.15); transition: 0.2s; font-size: 13px; }
         button:active { transform: scale(0.95); }
-        .btn-capture { background: var(--accent-color); width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; }
+        .btn-capture { background: var(--accent-color); width: 65px; height: 65px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .btn-action { background: #22c55e; }
         
-        #preview-canvas, #hidden-cv-canvas { display: none; }
+        #process-canvas, #hidden-cv-canvas { display: none; }
+        
+        /* Efek kilatan kamera saat menjepret */
+        .flash { animation: flashEffect 0.3s ease-out; }
+        @keyframes flashEffect { 0% { background: rgba(255,255,255,1); } 100% { background: rgba(255,255,255,0); } }
     </style>
 </head>
 <body>
 
-    <header><h2>OM TORO SCANNER</h2></header>
+    <div id="flash-element" style="position:absolute; width:100%; height:100%; z-index:9; pointer-events:none;"></div>
+    <header><h2>OM TORO SCANNER PRO</h2></header>
 
-    <div id="camera-container">
+    <div id="camera-wrapper">
         <video id="webcam" autoplay playsinline></video>
-        <!-- Canvas untuk bingkai dinamis -->
         <canvas id="overlay-canvas"></canvas>
-        <!-- Canvas untuk pemrosesan gambar -->
-        <canvas id="preview-canvas"></canvas>
-        <!-- Canvas tersembunyi untuk proses algoritma OpenCV -->
+        <canvas id="process-canvas"></canvas>
         <canvas id="hidden-cv-canvas"></canvas>
     </div>
 
     <div class="controls-overlay">
-        <div class="status-bar" id="status">Memuat AI Computer Vision...</div>
+        <div class="status-bar" id="status">Memuat Inteligensia Buatan (OpenCV)...</div>
         <div class="ocr-result" id="ocr-text"></div>
         
         <div class="btn-row">
-            <button id="filter-btn">Filter B&W</button>
+            <button id="filter-btn">Filter B&W: ON</button>
             <button id="ocr-btn">Ekstrak Teks (OCR)</button>
         </div>
 
-        <div class="btn-row" style="align-items: center;">
-            <button id="reset-btn" style="background:#ef4444;">Reset</button>
-            <button class="btn-capture" id="capture-btn"></button>
-            <button class="btn-action" id="download-btn">Unduh PDF</button>
+        <div class="btn-row" style="align-items: center; gap: 30px;">
+            <button id="reset-btn" style="background:#ef4444; padding: 10px 20px;">Reset</button>
+            <button class="btn-capture" id="capture-btn" title="Jepret Dokumen"></button>
+            <button class="btn-action" id="download-btn" style="padding: 10px 20px;">Unduh PDF</button>
         </div>
     </div>
 
@@ -76,190 +76,264 @@
         const video = document.getElementById('webcam');
         const overlayCanvas = document.getElementById('overlay-canvas');
         const overlayCtx = overlayCanvas.getContext('2d');
-        const previewCanvas = document.getElementById('preview-canvas');
+        const processCanvas = document.getElementById('process-canvas');
         const hiddenCvCanvas = document.getElementById('hidden-cv-canvas');
         const hiddenCvCtx = hiddenCvCanvas.getContext('2d', { willReadFrequently: true });
         
         const statusText = document.getElementById('status');
         const ocrDiv = document.getElementById('ocr-text');
+        const flashEl = document.getElementById('flash-element');
         
         let capturedImages = [];
         let useFilter = true;
         let gpsData = { lat: "-", lng: "-" };
         let openCvReady = false;
+        let detectedCorners = null; // Menyimpan koordinat sudut teranyar
 
-        // Inisiasi GPS
         navigator.geolocation.getCurrentPosition(
             p => { gpsData = { lat: p.coords.latitude.toFixed(5), lng: p.coords.longitude.toFixed(5) }; },
-            e => console.log("GPS Off")
+            e => console.log("GPS pasif")
         );
 
-        // Inisiasi Kamera
         async function initCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: {ideal: 1920} } });
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } 
+                });
                 video.srcObject = stream;
-                
-                // Set ukuran overlay canvas sama dengan ukuran layar HP
-                video.onloadedmetadata = () => {
-                    overlayCanvas.width = video.clientWidth;
-                    overlayCanvas.height = video.clientHeight;
-                };
-            } catch (e) { statusText.innerText = "Error Akses Kamera"; }
+                video.addEventListener('loadedmetadata', () => {
+                    resizeCanvases();
+                });
+            } catch (e) { statusText.innerText = "Gagal Akses Kamera."; }
         }
 
-        // Fungsi yang dipanggil otomatis saat OpenCV selesai dimuat
+        function resizeCanvases() {
+            overlayCanvas.width = video.clientWidth;
+            overlayCanvas.height = video.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvases);
+
         function onOpenCvReady() {
             openCvReady = true;
-            statusText.innerText = "Arahkan Kamera ke Dokumen";
+            statusText.innerText = "Arahkan pada dokumen fisik";
             requestAnimationFrame(processVideoFrame);
         }
 
-        // Proses AI: Mendeteksi tepi dokumen & menggambar bingkai dinamis
+        // Mengurutkan 4 sudut agar tidak terbalik saat Warp Perspective
+        function sortCorners(points) {
+            let pts = [{x: points[0], y: points[1]}, {x: points[2], y: points[3]}, {x: points[4], y: points[5]}, {x: points[6], y: points[7]}];
+            
+            // Urutkan berdasarkan nilai X
+            pts.sort((a, b) => a.x - b.x);
+            let leftMost = [pts[0], pts[1]];
+            let rightMost = [pts[2], pts[3]];
+
+            // Tentukan Top-Left dan Bottom-Left
+            leftMost.sort((a, b) => a.y - b.y);
+            let tl = leftMost[0];
+            let bl = leftMost[1];
+
+            // Tentukan Top-Right dan Bottom-Right
+            rightMost.sort((a, b) => a.y - b.y);
+            let tr = rightMost[0];
+            let br = rightMost[1];
+
+            return [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y];
+        }
+
+        // Engine Deteksi Tepi Real-Time (Bebas Leak Memori)
         function processVideoFrame() {
             if (!openCvReady || video.paused || video.ended) {
                 requestAnimationFrame(processVideoFrame);
                 return;
             }
 
+            let src = null, gray = null, edges = null, contours = null, hierarchy = null;
             try {
-                // Skala gambar diperkecil agar HP tidak lemot saat memproses video real-time
-                const processWidth = 320;
-                const processHeight = 240;
-                hiddenCvCanvas.width = processWidth;
-                hiddenCvCanvas.height = processHeight;
-                hiddenCvCtx.drawImage(video, 0, 0, processWidth, processHeight);
+                const pW = 320; const pH = 240;
+                hiddenCvCanvas.width = pW; hiddenCvCanvas.height = pH;
+                hiddenCvCtx.drawImage(video, 0, 0, pW, pH);
 
-                let src = cv.imread(hiddenCvCanvas);
-                let gray = new cv.Mat();
-                let edges = new cv.Mat();
-
-                // Ubah ke abu-abu lalu deteksi tepian (Edge Detection)
+                src = cv.imread(hiddenCvCanvas);
+                gray = new cv.Mat();
+                edges = new cv.Mat();
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                cv.Canny(gray, edges, 50, 150, 3, false);
+                cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+                cv.Canny(gray, edges, 75, 200, 3, false);
 
-                let contours = new cv.MatVector();
-                let hierarchy = new cv.Mat();
+                contours = new cv.MatVector();
+                hierarchy = new cv.Mat();
                 cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
                 let maxArea = 0;
-                let maxContourIndex = -1;
+                let bestApprox = null;
 
-                // Cari area kotak (dokumen) paling besar di layar
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
                     let area = cv.contourArea(cnt);
-                    if (area > 5000) { 
+                    if (area > 4000) {
                         let peri = cv.arcLength(cnt, true);
                         let approx = new cv.Mat();
                         cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
                         
-                        // Pastikan bentuknya segi empat (dokumen)
                         if (approx.rows === 4 && area > maxArea) {
                             maxArea = area;
-                            maxContourIndex = i;
+                            if (bestApprox) bestApprox.delete();
+                            bestApprox = approx;
+                        } else {
+                            approx.delete();
                         }
-                        approx.delete();
                     }
-                    cnt.delete();
+                    cnt.delete(); // Menghapus instansi kontur agar tidak leak!
                 }
 
-                // Bersihkan layar transparan
-                overlayCanvas.width = video.clientWidth;
-                overlayCanvas.height = video.clientHeight;
                 overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-                // Jika dokumen ditemukan, gambar bingkai dinamis warna oranye
-                if (maxContourIndex !== -1) {
-                    let cnt = contours.get(maxContourIndex);
-                    let peri = cv.arcLength(cnt, true);
-                    let approx = new cv.Mat();
-                    cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-
-                    // Hitung rasio untuk mengembalikan koordinat ke ukuran layar HP asli
-                    let scaleX = overlayCanvas.width / processWidth;
-                    let scaleY = overlayCanvas.height / processHeight;
-
+                
+                if (bestApprox) {
+                    let scaleX = overlayCanvas.width / pW;
+                    let scaleY = overlayCanvas.height / pH;
+                    
+                    let rawPoints = [];
                     overlayCtx.beginPath();
                     for (let i = 0; i < 4; i++) {
-                        let x = approx.data32S[i * 2] * scaleX;
-                        let y = approx.data32S[i * 2 + 1] * scaleY;
-                        if (i === 0) overlayCtx.moveTo(x, y);
-                        else overlayCtx.lineTo(x, y);
+                        let x = bestApprox.data32S[i * 2];
+                        let y = bestApprox.data32S[i * 2 + 1];
+                        rawPoints.push(x, y);
+
+                        let screenX = x * scaleX;
+                        let screenY = y * scaleY;
+                        if (i === 0) overlayCtx.moveTo(screenX, screenY);
+                        else overlayCtx.lineTo(screenX, screenY);
                     }
                     overlayCtx.closePath();
-                    
-                    // Desain bingkai dinamis
                     overlayCtx.lineWidth = 4;
-                    overlayCtx.strokeStyle = '#ff9f1c'; // Warna Warm Yellow Orange
-                    overlayCtx.fillStyle = 'rgba(255, 159, 28, 0.2)'; // Efek highlight tipis di tengah
+                    overlayCtx.strokeStyle = '#ff9f1c';
+                    overlayCtx.fillStyle = 'rgba(255, 159, 28, 0.15)';
                     overlayCtx.fill();
                     overlayCtx.stroke();
 
-                    approx.delete();
+                    // Simpan koordinat skala penuh untuk keperluan pemotongan nanti
+                    detectedCorners = {
+                        points: rawPoints,
+                        srcW: pW,
+                        srcH: pH
+                    };
+                    bestApprox.delete();
+                } else {
+                    detectedCorners = null;
                 }
 
-                // Hapus memori OpenCV agar browser tidak crash
-                src.delete(); gray.delete(); edges.delete(); contours.delete(); hierarchy.delete();
-
             } catch (err) {
-                console.log(err);
+                console.error(err);
+            } finally {
+                // Memastikan pembersihan memori C++ WebAssembly berjalan di setiap frame
+                if (src) src.delete(); if (gray) gray.delete(); if (edges) edges.delete();
+                if (contours) contours.delete(); if (hierarchy) hierarchy.delete();
             }
-            // Ulangi terus menerus seperti animasi
             requestAnimationFrame(processVideoFrame);
         }
 
-        // Toggle Filter Hitam Putih
+        // Toggle Filter B&W
         document.getElementById('filter-btn').addEventListener('click', (e) => {
             useFilter = !useFilter;
-            e.target.style.background = useFilter ? "rgba(255,255,255,0.1)" : "#ef4444";
-            statusText.innerText = useFilter ? "Filter B&W Aktif" : "Filter Dimatikan";
+            e.target.innerText = useFilter ? "Filter B&W: ON" : "Filter B&W: OFF";
+            e.target.style.background = useFilter ? "rgba(255,255,255,0.15)" : "#ef4444";
         });
 
-        function applyFilter(ctx, w, h) {
-            let imgData = ctx.getImageData(0, 0, w, h);
-            let d = imgData.data;
-            for (let i = 0; i < d.length; i += 4) {
-                let avg = (d[i] + d[i+1] + d[i+2]) / 3;
-                let c = avg > 110 ? 255 : avg - 60; 
-                d[i] = d[i+1] = d[i+2] = c;
-            }
-            ctx.putImageData(imgData, 0, 0);
+        function applyAdaptiveThreshold(canvasEl) {
+            let src = cv.imread(canvasEl);
+            let dst = new cv.Mat();
+            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
+            // Mengubah menjadi tipe dokumen teks murni bersinar tanpa bayangan tangan
+            cv.adaptiveThreshold(dst, dst, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
+            cv.imshow(canvasEl, dst);
+            src.delete(); dst.delete();
         }
 
-        // Tombol Jepret
+        // Mekanisme Capture + Cerdas Crop & Warp Perspective Dokumen
         document.getElementById('capture-btn').addEventListener('click', () => {
-            const ctx = previewCanvas.getContext('2d');
-            previewCanvas.width = video.videoWidth; 
-            previewCanvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, previewCanvas.width, previewCanvas.height);
+            // Efek Flash Visual
+            flashEl.classList.add('flash');
+            setTimeout(() => flashEl.classList.remove('flash'), 300);
+
+            const ctx = processCanvas.getContext('2d');
+            const vW = video.videoWidth;
+            const vH = video.videoHeight;
             
-            if(useFilter) applyFilter(ctx, previewCanvas.width, previewCanvas.height);
+            // Set kanvas pemroses ke resolusi asli kamera (High-res)
+            processCanvas.width = vW;
+            processCanvas.height = vH;
+            ctx.drawImage(video, 0, 0, vW, vH);
+
+            if (detectedCorners && openCvReady) {
+                try {
+                    let src = cv.imread(processCanvas);
+                    let dst = new cv.Mat();
+                    
+                    // Skala ulang koordinat sudut kecil ke ukuran resolusi video asli
+                    let sX = vW / detectedCorners.srcW;
+                    let sY = vH / detectedCorners.srcH;
+                    
+                    let origPoints = [];
+                    for(let i=0; i<4; i++){
+                        origPoints.push(detectedCorners.points[i*2] * sX, detectedCorners.points[i*2+1] * sY);
+                    }
+                    
+                    let sorted = sortCorners(origPoints);
+                    
+                    // Definisikan ukuran standar kertas A4 hasil akhir (Aspek rasio dokumen)
+                    const docW = 842;
+                    const docH = 1191; 
+                    
+                    let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, sorted);
+                    let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, docW, 0, docW, docH, 0, docH]);
+                    
+                    let M = cv.getPerspectiveTransform(srcTri, dstTri);
+                    let dsize = new cv.Size(docW, docH);
+                    
+                    // Eksekusi Pemotongan dan Perataan Perspektif Kertas
+                    cv.warpPerspective(src, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+                    
+                    processCanvas.width = docW;
+                    processCanvas.height = docH;
+                    cv.imshow(processCanvas, dst);
+                    
+                    src.delete(); dst.delete(); M.delete(); srcTri.delete(); dstTri.delete();
+                } catch(e) {
+                    console.error("Gagal warp, ambil gambar standar", e);
+                }
+            }
+
+            if(useFilter) {
+                applyAdaptiveThreshold(processCanvas);
+            }
             
-            capturedImages.push(previewCanvas.toDataURL('image/jpeg', 0.8));
-            statusText.innerText = `${capturedImages.length} Halaman Siap.`;
+            capturedImages.push(processCanvas.toDataURL('image/jpeg', 0.85));
+            statusText.innerText = `${capturedImages.length} Halaman Berhasil Diproses.`;
         });
 
-        // Tombol Ekstrak Teks
+        // Fitur OCR Bahasa Indonesia Terintegrasi
         document.getElementById('ocr-btn').addEventListener('click', async () => {
-            if(capturedImages.length === 0) return alert("Jepret dokumen dulu!");
-            statusText.innerText = "Membaca teks dokumen (OCR)...";
-            ocrDiv.style.display = "block"; ocrDiv.innerText = "Memproses...";
+            if(capturedImages.length === 0) return alert("Silakan jepret dokumen terlebih dahulu!");
+            statusText.innerText = "Membaca teks secara digital (OCR)...";
+            ocrDiv.style.display = "block"; ocrDiv.innerText = "Menganalisis karakter teks...";
             
-            Tesseract.recognize(capturedImages[capturedImages.length-1], 'ind', { logger: m => console.log(m) })
+            Tesseract.recognize(capturedImages[capturedImages.length-1], 'ind')
                 .then(({ data: { text } }) => {
-                    ocrDiv.innerText = text;
+                    ocrDiv.innerText = text ? text : "Teks tidak terbaca. Pastikan dokumen cukup cahaya.";
                     statusText.innerText = "OCR Selesai.";
+                }).catch(e => {
+                    statusText.innerText = "Gagal memproses OCR.";
                 });
         });
 
-        // Tombol Download Langsung
+        // Unduh PDF Hasil Pemotongan Sempurna
         document.getElementById('download-btn').addEventListener('click', () => {
-            if(capturedImages.length === 0) return alert("Belum ada dokumen!");
-            statusText.innerText = "Membuat PDF...";
+            if(capturedImages.length === 0) return alert("Belum ada dokumen yang disimpan!");
+            statusText.innerText = "Mengompilasi PDF Dokumen...";
 
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF();
+            const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
             const timestamp = new Date().toLocaleString('id-ID');
 
             capturedImages.forEach((img, i) => {
@@ -268,25 +342,20 @@
                 let h = pdf.internal.pageSize.getHeight();
                 pdf.addImage(img, 'JPEG', 0, 0, w, h);
                 
-                // Watermark Om Toro Scanner
-                pdf.setTextColor(255, 0, 0); pdf.setFontSize(10);
-                pdf.text("SCANNED BY OM TORO SCANNER", 10, h - 20);
-                pdf.text(`WAKTU: ${timestamp} | GPS: ${gpsData.lat}, ${gpsData.lng}`, 10, h - 10);
+                pdf.setTextColor(200, 0, 0); pdf.setFontSize(9);
+                pdf.text("SCANNED BY OM TORO SCANNER PRO", 10, h - 15);
+                pdf.text(`WAKTU LOG: ${timestamp} | GPS KOORDINAT: ${gpsData.lat}, ${gpsData.lng}`, 10, h - 10);
             });
 
-            pdf.save(`Scan_Om_Toro_${Date.now()}.pdf`);
+            pdf.save(`Om_Toro_Scan_${Date.now()}.pdf`);
             capturedImages = []; 
-            statusText.innerText = "Berhasil Diunduh!";
+            statusText.innerText = "PDF Berhasil Diunduh!";
         });
 
-        // Tombol Reset
         document.getElementById('reset-btn').addEventListener('click', () => { 
-            capturedImages = []; 
-            ocrDiv.style.display="none"; 
-            statusText.innerText="Data Dihapus."; 
+            capturedImages = []; ocrDiv.style.display="none"; statusText.innerText="Sistem direset."; 
         });
 
-        // Jalankan Kamera Saat Halaman Dibuka
         window.onload = initCamera;
     </script>
 </body>
